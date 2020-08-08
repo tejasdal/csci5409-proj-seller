@@ -1,0 +1,27 @@
+<ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="/products/list"> Products</a></li>
+    <li class="breadcrumb-item active">Edit Data</li>
+</ol>
+
+<h1 class="diaplay-4">Edit Product</h1>
+
+<form method="post" action="/products/update/?id=<%= product.id %>">
+<div class="form-group">
+    <label for="product_id">Product ID</label>
+    <input type="text" disabled name="product_id" class="form-control" value="<%= product.product_id %>">
+</div>
+<div class="form-group">
+    <label for="product_name">Product Name</label>
+    <input type="text"disabled name="product_name" class="form-control" value="<%= product.product_name %>">
+</div>
+<div class="form-group">
+    <label for="product_price">Product Price (CAD)</label>
+    <input type="number" min="0" name="product_price" class="form-control" value="<%= product.product_price %>" required>
+</div>
+<div class="form-group">
+    <label for="qoh">Quantity on Hand</label>
+    <input type="number" min="0" name="qoh" class="form-control" value="<%= product.qoh %>" required>
+</div>
+    <input type="hidden" name="id" class="form-control" value="<%= product.id %>">
+<input type="submit" value="Submit" class="btn btn-primary">
+</form>

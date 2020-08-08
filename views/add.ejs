@@ -1,0 +1,30 @@
+<ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="/products/list"><List></List> Products </a></li>
+    <li class="breadcrumb-item active">Add Product</a></li>
+</ol>
+
+<h1 class="display-4">Add Product</h1>
+
+<form method="post" action="/products/create">
+<div class="form-group">
+    <label for="product_id">Product ID</label>
+    <input type="number"  name="product_id" class="form-control" required>
+</div>
+<div class="form-group">
+    <label for="product_name">Product Name</label>
+    <input type="text" name="product_name" class="form-control" required>
+</div>
+<div class="form-group">
+    <label for="product_url">Product Image URL</label>
+    <input type="text" name="product_url" class="form-control" required>
+</div>
+<div class="form-group">
+    <label for="product_price">Product Price (CAD)</label>
+    <input type="number" min="0" name="product_price" class="form-control" required>
+</div>
+<div class="form-group">
+    <label for="qoh">Quantity on Hand</label>
+    <input type="number" min="0" name="qoh" class="form-control" required>
+</div>
+<input type="submit" value="Submit" class="btn btn-primary">
+</form>
