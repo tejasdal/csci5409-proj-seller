@@ -13,5 +13,6 @@ module.exports.routes = {
   // APIs
   'GET /products/get-all-products': 'SellerController.productsArr',
   'GET /products/get-product': 'SellerController.productById',
+  'POST /products/order': 'SellerController.createOrder',
 
 };
