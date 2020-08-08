@@ -1,3 +1,5 @@
+const orders = require("../models/orders");
+
 module.exports = {
 
   list:function(req, res){
@@ -9,7 +11,6 @@ module.exports = {
       res.view('list', {prod:pro});
     });
   },
-
 
   add:function(req, res){
     res.view('add');
@@ -92,6 +93,17 @@ module.exports = {
       res.send(500, {error: 'Database error while getting part'});
     }
     res.send(200,products);
+    });
+  },
+
+
+  orderList:function(req, res){
+    Orders.find({}).exec(function(err, order){
+      if(err){
+        console.log(err);
+        res.send(500, {error: 'Database Error'});
+      }
+      res.view('orders', {orderslist:order});
     });
   },
 
