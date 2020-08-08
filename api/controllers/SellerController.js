@@ -87,7 +87,7 @@ module.exports = {
   // API for getting All products
   productsArr: function(req,res){
 
-    products.find({}).exec(function (err,products) {
+    Products.find({}).exec(function (err,products) {
     if (err){
       console.log(err);
       res.send(500, {error: 'Database error while getting part'});
@@ -96,6 +96,16 @@ module.exports = {
     });
   },
 
+  productById: function(req,res){ 
+    console.log(req.query);
+    Products.findOne({id:req.query.productId}).exec(function (err,product) {
+    if (err){
+      console.log(err);
+      res.send(500, {error: 'Database error while getting part'});
+    }
+    res.send(200,product);
+    });
+  },
 
   orderList:function(req, res){
     Orders.find({}).exec(function(err, order){
