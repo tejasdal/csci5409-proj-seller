@@ -1,4 +1,3 @@
-const orders = require("../models/orders");
 
 module.exports = {
 
@@ -117,9 +116,20 @@ module.exports = {
     });
   },
 
-  createOrder: function (req, res) {
+  createOrder: async function (req, res) {
 
-    // TODO: Add 2phase commit protocol logic here.
+
+    // start XD with Unique ID  
+
+    let startQuery = "xa start '1';";
+    let stopQuery = "xa end '1';";
+    let prepareQuery = "xa prepare '1';";
+    let commitQuery = "xa commit '1';";
+
+    await sails.getDatastore().sendNativeQuery(startQuery);
+    await sails.getDatastore().sendNativeQuery(stopQuery);
+    await sails.getDatastore().sendNativeQuery(prepareQuery);
+    await sails.getDatastore().sendNativeQuery(commitQuery);
 
     let order = {
       order_id: req.body.order_id,
@@ -131,13 +141,49 @@ module.exports = {
       order_total: req.body.order_total,
     };
 
-    Orders.create(order).exec(function (err) {
+    
+    let old_qoh;
+
+    products.findOne({ product_id: order.product_id }).exec(function (err, product) {
+      console.log("getting old qoh to reduce it");
       if (err) {
         console.log(err);
-        res.send(500, { error: 'Database Error' });
+        res.send(500, { error: 'Database error while getting old qoh' });
       }
-      res.status(200).send(order);
+
+      old_qoh = product.qoh;
+      console.log("old qoh is: " + old_qoh );
+
+
+      order.order_qty = old_qoh - order.order_qty;
+      console.log("qoh is substracted to :" + order.order_qty );
+
+      products.update({ product_id: order.product_id }, { qoh: order.order_qty}).exec(function (err) {
+        console.log("Updating new qoh to db");
+        if (err) {
+          console.log(err);
+          res.send(500, { error: 'Database Error while updating new qoh' });
+        }
+        console.log("qoh is updated db");
+
+        Orders.create(order).exec(function (err) {
+          if (err) {
+            console.log(err);  
+            res.send(500, { error: 'Database Error' });
+          }
+          res.status(200).send(order);
+        });
+      });
+
+
     });
+
+
+    
+
+    
+
+    
   },
 
 };
