@@ -9,5 +9,5 @@ module.exports = {
         order_total:{type: 'number'},
     },
     tableName: 'Orders',
-  };   
+  };
     

@@ -1,15 +1,18 @@
 const axios = require('axios');
 
 async function commitorrollback(bool,XA_ID) {
-  let URL = "http://192.168.0.52:3000" + '/order/commit?perform='+bool+'&tranId='+XA_ID ;
-  console.log(URL);
-  let response = await axios.post(URL);
-  console.log(response);
+  
+  let URL_KART = "https://q7m3gl0cj2.execute-api.us-east-1.amazonaws.com/mykart-cloud-project" + '/order/commit?perform='+bool+'&tranId='+XA_ID ;
+  let URL_DEL = "http://ec2-18-212-133-17.compute-1.amazonaws.com:1337" + '/delivery/order/commit?perform='+bool+'&tranId='+XA_ID ;
+  
+  console.log(URL_DEL);
+  console.log(URL_KART);
+  let response_kart = await axios.get(URL_DEL);
+  let response_del = await axios.post(URL_KART);
+  console.log(response_del);
+  console.log(response_kart);
 }
 
-async function rollback(XAID) {
-  console.log("Calling rollback API");
-}
 async function xa_start(XAID) {
   console.log("Starting XA");
   let sql = "xa start '" + XAID + "';";
