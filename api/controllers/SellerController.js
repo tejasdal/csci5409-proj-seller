@@ -1,3 +1,131 @@
+const axios = require('axios');
+
+async function commitorrollback(bool,XA_ID) {
+  let URL = "http://192.168.0.52:3000" + '/order/commit?perform='+bool+'&tranId='+XA_ID ;
+  console.log(URL);
+  let response = await axios.post(URL);
+  console.log(response);
+}
+
+async function rollback(XAID) {
+  console.log("Calling rollback API");
+}
+async function xa_start(XAID) {
+  console.log("Starting XA");
+  let sql = "xa start '" + XAID + "';";
+  await sails.getDatastore().sendNativeQuery(sql);
+}
+
+async function xa_end(XAID) {
+  console.log("Endind XA");
+  let sql = "xa end '" + XAID + "';";
+  await sails.getDatastore().sendNativeQuery(sql);
+}
+
+async function xa_rollback(XAID) {
+  console.log("Rollinng back XA");
+  let sql = "xa rollback '" + XAID + "';";
+  await sails.getDatastore().sendNativeQuery(sql);
+}
+
+async function xa_prepare(XAID) {
+  console.log("preparing XA");
+  let sql = "xa prepare '" + XAID + "';";
+  await sails.getDatastore().sendNativeQuery(sql);
+}
+
+async function xa_commit(XAID) {
+  console.log("comit XA");
+  let sql = "xa commit '" + XAID + "';";
+  await sails.getDatastore().sendNativeQuery(sql);
+}
+
+async function asyncPlaceOrder(req, res){
+
+  // start XD with Unique ID  
+  let XA_ID = req.query.tranId;
+
+  console.log(XA_ID + " is recived XA ID");
+
+  xa_start(XA_ID);
+
+  let order = {
+    order_id: req.body.order_id,
+    user_id: req.body.user_id,
+    seller_id: req.body.seller_id,
+    order_qty: req.body.order_qty,
+    product_id: req.body.product_id,
+    user_address: req.body.user_address,
+    order_total: req.body.order_total,
+  };
+
+
+  let old_qoh;
+
+  // gets old qoh for product_id
+  products.findOne({ product_id: order.product_id }).exec(function (err, product) {
+    console.log("getting old qoh to reduce it");
+    if (err) {
+      console.log(err);
+      xa_end(XA_ID);
+      xa_prepare(XA_ID);
+      xa_rollback(XA_ID);
+      commitorrollback(false,XA_ID);
+    }
+
+    old_qoh = product.qoh;
+    console.log("old qoh is: " + old_qoh);
+
+    if (old_qoh - order.order_qty >= 0) {
+      // proceed
+
+      // reduced qoh 
+      let temp = old_qoh - order.order_qty;
+      console.log("qoh is substracted to :" + order.order_qty);
+
+      products.update({ product_id: order.product_id }, { qoh: temp }).exec(function (err) {
+        console.log("Updating new qoh to db");
+        if (err) {
+          console.log(err);
+            xa_end(XA_ID);
+            xa_prepare(XA_ID);
+            xa_rollback(XA_ID);
+            commitorrollback(false,XA_ID);
+        }
+        console.log("qoh is updated db");
+
+        // creates entry in order table
+        Orders.create(order).exec(function (err) {
+          if (err) {
+            console.log(err);
+            // TODO if error occures here revert the qoh deduction
+            //rollback
+            xa_end(XA_ID);
+            xa_prepare(XA_ID);
+            xa_rollback(XA_ID);
+            commitorrollback(false,XA_ID);
+          }
+          // res.status(200).send(order);
+          //add
+          xa_end(XA_ID);
+          xa_prepare(XA_ID);
+          xa_commit(XA_ID);
+          //commi
+          commitorrollback(true,XA_ID);
+        });
+      });
+
+    } else {
+      //rollback
+      xa_end(XA_ID);
+      xa_prepare(XA_ID);
+      xa_rollback(XA_ID);
+      commitorrollback(false,XA_ID);
+    }
+
+  });
+
+}
 
 module.exports = {
 
@@ -97,7 +225,7 @@ module.exports = {
 
   productById: function (req, res) {
     console.log(req.query);
-    Products.findOne({ id: req.query.productId }).exec(function (err, product) {
+    products.findOne({ id: req.query.productId }).exec(function (err, product) {
       if (err) {
         console.log(err);
         res.send(500, { error: 'Database error while getting part' });
@@ -118,72 +246,82 @@ module.exports = {
 
   createOrder: async function (req, res) {
 
+    asyncPlaceOrder(req, res);
+    res.status(200).send("Processing order.");
+    // // start XD with Unique ID  
+    // let XA_ID = req.query.tranId;
 
-    // start XD with Unique ID  
+    // xa_start(XA_ID);
 
-    let startQuery = "xa start '1';";
-    let stopQuery = "xa end '1';";
-    let prepareQuery = "xa prepare '1';";
-    let commitQuery = "xa commit '1';";
-
-    await sails.getDatastore().sendNativeQuery(startQuery);
-    await sails.getDatastore().sendNativeQuery(stopQuery);
-    await sails.getDatastore().sendNativeQuery(prepareQuery);
-    await sails.getDatastore().sendNativeQuery(commitQuery);
-
-    let order = {
-      order_id: req.body.order_id,
-      user_id: req.body.user_id,
-      seller_id: req.body.seller_id,
-      order_qty: req.body.order_qty,
-      product_id: req.body.product_id,
-      user_address: req.body.user_address,
-      order_total: req.body.order_total,
-    };
-
-    
-    let old_qoh;
-
-    products.findOne({ product_id: order.product_id }).exec(function (err, product) {
-      console.log("getting old qoh to reduce it");
-      if (err) {
-        console.log(err);
-        res.send(500, { error: 'Database error while getting old qoh' });
-      }
-
-      old_qoh = product.qoh;
-      console.log("old qoh is: " + old_qoh );
+    // let order = {
+    //   order_id: req.body.order_id,
+    //   user_id: req.body.user_id,
+    //   seller_id: req.body.seller_id,
+    //   order_qty: req.body.order_qty,
+    //   product_id: req.body.product_id,
+    //   user_address: req.body.user_address,
+    //   order_total: req.body.order_total,
+    // };
 
 
-      order.order_qty = old_qoh - order.order_qty;
-      console.log("qoh is substracted to :" + order.order_qty );
+    // let old_qoh;
 
-      products.update({ product_id: order.product_id }, { qoh: order.order_qty}).exec(function (err) {
-        console.log("Updating new qoh to db");
-        if (err) {
-          console.log(err);
-          res.send(500, { error: 'Database Error while updating new qoh' });
-        }
-        console.log("qoh is updated db");
+    // // gets old qoh for product_id
+    // products.findOne({ product_id: order.product_id }).exec(function (err, product) {
+    //   console.log("getting old qoh to reduce it");
+    //   if (err) {
+    //     console.log(err);
+    //     res.send(500, { error: 'Database error while getting old qoh' });
+    //   }
 
-        Orders.create(order).exec(function (err) {
-          if (err) {
-            console.log(err);  
-            res.send(500, { error: 'Database Error' });
-          }
-          res.status(200).send(order);
-        });
-      });
+    //   old_qoh = product.qoh;
+    //   console.log("old qoh is: " + old_qoh);
+
+    //   if (old_qoh - order.order_qty >= 0) {
+    //     // proceed
+
+    //     // reduced qoh 
+    //     let temp = old_qoh - order.order_qty;
+    //     console.log("qoh is substracted to :" + order.order_qty);
+
+    //     products.update({ product_id: order.product_id }, { qoh: temp }).exec(function (err) {
+    //       console.log("Updating new qoh to db");
+    //       if (err) {
+    //         console.log(err);
+    //         res.send(500, { error: 'Database Error while updating new qoh' });
+    //       }
+    //       console.log("qoh is updated db");
+
+    //       // creates entry in order table
+    //       Orders.create(order).exec(function (err) {
+    //         if (err) {
+    //           console.log(err);
+    //           res.send(500, { error: 'Database Error' });
+    //           // TODO if error occures here revert the qoh deduction
+    //         }
+    //         res.status(200).send(order);
+    //       });
+    //     });
+
+    //     xa_end(XA_ID);
+    //     xa_prepare(XA_ID);
+    //     xa_commit(XA_ID);
+    //     //commi
+    //     commitorrollback(true,XA_ID);
+
+    //   } else {
+    //     //rollback
+    //     xa_end(XA_ID);
+    //     xa_prepare(XA_ID);
+    //     xa_rollback(XA_ID);
+    //     commitorrollback(false,XA_ID);
+    //   }
+
+    // });
 
 
-    });
-
-
-    
-
-    
-
-    
   },
 
 };
+
+
