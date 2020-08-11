@@ -4,6 +4,9 @@ async function commitorrollback(bool,XA_ID) {
   
   let URL_KART = "https://q7m3gl0cj2.execute-api.us-east-1.amazonaws.com/mykart-cloud-project" + '/order/commit?perform='+bool+'&tranId='+XA_ID ;
   let URL_DEL = "http://ec2-18-212-133-17.compute-1.amazonaws.com:1337" + '/delivery/order/commit?perform='+bool+'&tranId='+XA_ID ;
+
+  //let URL_KART = "http://192.168.0.52:3000" + '/order/commit?perform='+bool+'&tranId='+XA_ID ;
+  //let URL_DEL = "http://192.168.0.52:8848" + '/delivery/order/commit?perform='+bool+'&tranId='+XA_ID ;
   
   console.log(URL_DEL);
   console.log(URL_KART);
@@ -50,7 +53,7 @@ async function asyncPlaceOrder(req, res){
 
   console.log(XA_ID + " is recived XA ID");
 
-  xa_start(XA_ID);
+  await xa_start(XA_ID);
 
   let order = {
     order_id: req.body.order_id,
@@ -62,18 +65,17 @@ async function asyncPlaceOrder(req, res){
     order_total: req.body.order_total,
   };
 
-
   let old_qoh;
 
   // gets old qoh for product_id
-  products.findOne({ product_id: order.product_id }).exec(function (err, product) {
+  products.findOne({ product_id: order.product_id }).exec( async function (err, product) {
     console.log("getting old qoh to reduce it");
     if (err) {
       console.log(err);
-      xa_end(XA_ID);
-      xa_prepare(XA_ID);
-      xa_rollback(XA_ID);
-      commitorrollback(false,XA_ID);
+      await xa_end(XA_ID);
+      await xa_prepare(XA_ID);
+      await xa_rollback(XA_ID);
+      await commitorrollback(false,XA_ID);
     }
 
     old_qoh = product.qoh;
@@ -86,49 +88,55 @@ async function asyncPlaceOrder(req, res){
       let temp = old_qoh - order.order_qty;
       console.log("qoh is substracted to :" + order.order_qty);
 
-      products.update({ product_id: order.product_id }, { qoh: temp }).exec(function (err) {
+      products.update({ id: product.id }, { qoh: temp }).exec(async function (err) {
         console.log("Updating new qoh to db");
         if (err) {
           console.log(err);
-            xa_end(XA_ID);
-            xa_prepare(XA_ID);
-            xa_rollback(XA_ID);
-            commitorrollback(false,XA_ID);
+          await xa_end(XA_ID);
+          await xa_prepare(XA_ID);
+          await xa_rollback(XA_ID);
+          await commitorrollback(false,XA_ID);
         }
         console.log("qoh is updated db");
 
         // creates entry in order table
-        Orders.create(order).exec(function (err) {
+        Orders.create(order).exec(async function (err) {
           if (err) {
-            console.log(err);
+            console.log("Error while creating new ordr in db: "+err);
             // TODO if error occures here revert the qoh deduction
             //rollback
-            xa_end(XA_ID);
-            xa_prepare(XA_ID);
-            xa_rollback(XA_ID);
-            commitorrollback(false,XA_ID);
+            await xa_end(XA_ID);
+            await xa_prepare(XA_ID);
+            await xa_rollback(XA_ID);
+            await commitorrollback(false,XA_ID);
           }
           // res.status(200).send(order);
           //add
-          xa_end(XA_ID);
-          xa_prepare(XA_ID);
-          xa_commit(XA_ID);
-          //commi
-          commitorrollback(true,XA_ID);
+          console.log("order created sucessfully on seller db for trans ID : " + XA_ID);
+          await xa_end(XA_ID);
+          await xa_prepare(XA_ID);
+          await xa_commit(XA_ID);
+          //commit
+          
+          await commitorrollback(true,XA_ID);
         });
       });
 
     } else {
       //rollback
-      xa_end(XA_ID);
-      xa_prepare(XA_ID);
-      xa_rollback(XA_ID);
-      commitorrollback(false,XA_ID);
+      console.log(" Not Enough stock ");
+
+      await xa_end(XA_ID);
+      await xa_prepare(XA_ID);
+      await xa_rollback(XA_ID);
+      await commitorrollback(false,XA_ID);
     }
 
   });
 
 }
+
+
 
 module.exports = {
 
